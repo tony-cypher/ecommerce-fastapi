@@ -1,7 +1,8 @@
-from sqlmodel import SQLModel, Field
-from sqlalchemy import Column, String, Boolean
+from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import Column, String, Boolean, ForeignKey
 import sqlalchemy.dialects.postgresql as pg
 from datetime import datetime, timezone
+from typing import Optional, List
 import uuid
 
 
@@ -40,6 +41,34 @@ class User(SQLModel, table=True):
     updated_at: datetime = Field(
         sa_column=Column(pg.TIMESTAMP(timezone=True), default=utc_now, nullable=False)
     )
+    refresh_tokens: List["RefreshToken"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"lazy": "selectin", "cascade": "all, delete-orphan"},
+    )
 
     def __repr__(self):
         return f"<User {self.username}"
+
+
+class RefreshToken(SQLModel, table=True):
+    __tablename__ = "refresh_tokens"
+
+    id: uuid.UUID = Field(
+        sa_column=Column(pg.UUID, primary_key=True, default=uuid.uuid4, nullable=False)
+    )
+    jti: str = Field(
+        sa_column=Column(pg.VARCHAR, index=True, nullable=False, unique=True)
+    )
+    user_uid: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, ForeignKey("users.uid", ondelete="CASCADE"), nullable=False
+        )
+    )
+    expires_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, default=utc_now, nullable=False)
+    )
+    revoked: bool = Field(default=False)
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP, default=utc_now, nullable=False)
+    )
+    user: Optional[User] = Relationship(back_populates="refresh_tokens")
