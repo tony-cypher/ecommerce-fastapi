@@ -65,10 +65,10 @@ class RefreshToken(SQLModel, table=True):
         )
     )
     expires_at: datetime = Field(
-        sa_column=Column(pg.TIMESTAMP, default=utc_now, nullable=False)
+        sa_column=Column(pg.TIMESTAMP(timezone=True), default=utc_now, nullable=False)
     )
     revoked: bool = Field(default=False)
     created_at: datetime = Field(
-        sa_column=Column(pg.TIMESTAMP, default=utc_now, nullable=False)
+        sa_column=Column(pg.TIMESTAMP(timezone=True), default=utc_now, nullable=False)
     )
     user: Optional[User] = Relationship(back_populates="refresh_tokens")
