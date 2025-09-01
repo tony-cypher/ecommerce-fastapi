@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from src.db.main import init_db
+from src.auth.routes import auth_router
+from .middleware import register_middleware
 
 
 @asynccontextmanager
@@ -21,6 +23,10 @@ app = FastAPI(
     contact={"email": "cipherangelmadara@gmail.com"},
     openapi_url=f"{version_prefix}/openapi.json",
 )
+
+register_middleware(app)
+
+app.include_router(auth_router, prefix=f"{version_prefix}/auth", tags=["auth"])
 
 
 @app.get("/")

@@ -5,6 +5,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.config import settings
 
 engine = create_async_engine(url=settings.DATABASE_URL)
+print("DATABASE-TEST")
+print(settings.DATABASE_URL)
 
 
 async def init_db():
