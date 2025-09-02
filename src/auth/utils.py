@@ -5,6 +5,7 @@ from src.config import settings
 from src.db.models import RefreshToken
 import uuid
 import jwt
+import logging
 
 
 password_context = CryptContext(schemes=["bcrypt"])
@@ -62,3 +63,14 @@ async def create_refresh_token(
     await session.commit()
 
     return token
+
+
+def decode_token(token: str) -> dict:
+    try:
+        token_data = jwt.decode(
+            jwt=token, key=settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+        )
+        return token_data
+    except jwt.PyJWTError as err:
+        logging.exception(err)
+        return None
