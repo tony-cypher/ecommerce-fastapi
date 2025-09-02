@@ -16,6 +16,12 @@ class InvalidToken(EcommerceException):
     pass
 
 
+class InvalidAccessToken(EcommerceException):
+    """User has provided an invalid access token"""
+
+    pass
+
+
 def create_exception_handler(
     status_code: int, initial_detail: Any
 ) -> Callable[[Request, Exception], JSONResponse]:
@@ -34,6 +40,18 @@ def register_all_errors(app: FastAPI):
                 "message": "Token is invalid or expired",
                 "resolution": "Please get new token",
                 "error_code": "Invalid token",
+            },
+        ),
+    )
+
+    app.add_exception_handler(
+        InvalidAccessToken,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_detail={
+                "message": "Access token is invalid or expired",
+                "resolution": "Please get a new access token",
+                "error_code": "Invalid access token",
             },
         ),
     )
