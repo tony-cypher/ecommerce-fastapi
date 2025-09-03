@@ -1,57 +1,79 @@
-from fastapi import FastAPI, status
-from fastapi.requests import Request
-from fastapi.responses import JSONResponse
-from typing import Any, Callable
+from fastapi import HTTPException, status
 
 
-class EcommerceException(Exception):
+class EcommerceException(HTTPException):
     """This is the base class for all E-commerce errors"""
 
-    pass
+    def __init__(
+        self,
+        status_code: int = status.HTTP_400_BAD_REQUEST,
+        message: str = "An unexpected error occurred",
+        resolution: str = "Contact support",
+        error_code: str = "UnknownError",
+    ):
+        detail = {
+            "message": message,
+            "resolution": resolution,
+            "error_code": error_code,
+        }
+        super().__init__(status_code=status_code, detail=detail)
 
 
 class InvalidToken(EcommerceException):
-    """User has provided an invalid or expired token"""
-
-    pass
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Token is invalid or expired",
+            resolution="Please provide a new token",
+            error_code="InvalidToken",
+        )
 
 
 class InvalidAccessToken(EcommerceException):
-    """User has provided an invalid access token"""
-
-    pass
-
-
-def create_exception_handler(
-    status_code: int, initial_detail: Any
-) -> Callable[[Request, Exception], JSONResponse]:
-    async def exception_handler(request: Request, exec: EcommerceException):
-        return JSONResponse(content=initial_detail, status_code=status_code)
-
-    return exception_handler
-
-
-def register_all_errors(app: FastAPI):
-    app.add_exception_handler(
-        InvalidToken,
-        create_exception_handler(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            initial_detail={
-                "message": "Token is invalid or expired",
-                "resolution": "Please get new token",
-                "error_code": "Invalid token",
-            },
-        ),
-    )
-
-    app.add_exception_handler(
-        InvalidAccessToken,
-        create_exception_handler(
+    def __init__(self):
+        super().__init__(
             status_code=status.HTTP_403_FORBIDDEN,
-            initial_detail={
-                "message": "Access token is invalid or expired",
-                "resolution": "Please get a new access token",
-                "error_code": "Invalid access token",
-            },
-        ),
-    )
+            message="Access token is invalid or expired",
+            resolution="Please provide a new access token",
+            error_code="InvalidAccessToken",
+        )
+
+
+class InvalidRefreshToken(EcommerceException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Refresh token is invalid or expired",
+            resolution="Please provide a valid refresh token",
+            error_code="InvalidRefreshToken",
+        )
+
+
+class TokenExpired(EcommerceException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            message="Token has expired",
+            resolution="Please login again",
+            error_code="TokenExpired",
+        )
+
+
+class AccessTokenRequired(EcommerceException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Refresh token cannot be used for authentication",
+            resolution="Provide a valid access token",
+            error_code="AccessTokenRequired",
+        )
+
+
+class UserNotFound(EcommerceException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            message="User not found",
+            resolution="Ensure the user exists or register a new account",
+            error_code="UserNotFound",
+        )
