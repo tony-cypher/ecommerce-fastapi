@@ -1,8 +1,10 @@
 from sqlmodel.ext.asyncio.session import AsyncSession
 from passlib.context import CryptContext
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from jwt import ExpiredSignatureError
 from src.config import settings
 from src.db.models import RefreshToken
+from src.errors import TokenExpired, InvalidToken
 import uuid
 import jwt
 import logging
@@ -10,13 +12,12 @@ import logging
 
 password_context = CryptContext(schemes=["bcrypt"])
 
-ACCESS_TOKEN_EXPIRY = 300
+ACCESS_TOKEN_EXPIRY = 60
 REFRESH_TOKEN_EXPIRY = 86400
 
 
 def generate_password_hash(password: str) -> str:
-    hash = password_context.hash(password)
-    return hash
+    return password_context.hash(password)
 
 
 def verify_password(password: str, hash: str) -> bool:
@@ -25,29 +26,34 @@ def verify_password(password: str, hash: str) -> bool:
 
 def create_access_token(
     user_data: dict, expiry: timedelta = None, refresh: bool = False
-):
-    payload = {}
-    payload["user"] = user_data
-    payload["exp"] = datetime.now() + (
+) -> str:
+    """Generate a signed JWT access token"""
+    expiry_time = datetime.now(timezone.utc) + (
         expiry if expiry is not None else timedelta(seconds=ACCESS_TOKEN_EXPIRY)
     )
-    payload["jti"] = str(uuid.uuid4())
-    payload["refresh"] = refresh
-    token = jwt.encode(
+    payload = {
+        "user": user_data,
+        "exp": int(expiry_time.timestamp()),
+        "jti": str(uuid.uuid4()),
+        "refresh": refresh,
+    }
+    return jwt.encode(
         payload=payload, key=settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
     )
-    return token
 
 
 async def create_refresh_token(
     user_data: dict, session: AsyncSession, expiry: timedelta = None
 ) -> str:
-    expires = datetime.now() + (expiry if expiry is not None else timedelta(days=7))
+    """Generates and persists a refresh token in DB"""
+    expires = datetime.now(timezone.utc) + (
+        expiry if expiry is not None else timedelta(days=7)
+    )
     jti = str(uuid.uuid4())
 
     token_payload = {
         "user": user_data,
-        "exp": expires.timestamp(),
+        "exp": int(expires.timestamp()),
         "jti": jti,
         "refresh": True,
     }
@@ -56,6 +62,7 @@ async def create_refresh_token(
         token_payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
     )
 
+    # Save refresh token in DB
     refresh_token = RefreshToken(
         jti=jti, user_uid=user_data["user_uid"], expires_at=expires, revoked=False
     )
@@ -66,11 +73,19 @@ async def create_refresh_token(
 
 
 def decode_token(token: str) -> dict:
+    """Decode and validate a JWT token, raise error if invalid/expired"""
     try:
-        token_data = jwt.decode(
-            jwt=token, key=settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+        return jwt.decode(
+            jwt=token,
+            key=settings.JWT_SECRET,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"verify_exp": True},
         )
-        return token_data
+
+    except ExpiredSignatureError:
+        logging.warning("Token has expired yes")
+
+        raise TokenExpired()
     except jwt.PyJWTError as err:
-        logging.exception(err)
-        return None
+        logging.exception("Invalid token yes: %s", err)
+        raise InvalidToken()
