@@ -4,8 +4,9 @@ from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.main import get_session
 from .service import UserService
-from .schemas import SignupModel, LoginModel
+from .schemas import SignupModel, LoginModel, UserModel
 from .utils import verify_password, create_access_token, create_refresh_token
+from .dependencies import get_current_user
 
 auth_router = APIRouter()
 user_service = UserService()
@@ -59,3 +60,8 @@ async def login(data: LoginModel, session: AsyncSession = Depends(get_session)):
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Email or Password"
     )
+
+
+@auth_router.get("/me", response_model=UserModel)
+async def current_user(user=Depends(get_current_user)):
+    return user
