@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, status
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.main import get_session
+from src.db.models import RefreshToken
 from .service import UserService
 from .schemas import SignupModel, LoginModel, UserModel
 from .utils import verify_password, create_access_token, create_refresh_token
-from .dependencies import get_current_user
+from .dependencies import get_current_user, AccessTokenBearer
 
 auth_router = APIRouter()
 user_service = UserService()
@@ -65,3 +67,29 @@ async def login(data: LoginModel, session: AsyncSession = Depends(get_session)):
 @auth_router.get("/me", response_model=UserModel)
 async def current_user(user=Depends(get_current_user)):
     return user
+
+
+@auth_router.get("/logout")
+async def logout(
+    token_details: dict = Depends(AccessTokenBearer()),
+    session: AsyncSession = Depends(get_session),
+):
+    user_uid = token_details["user"]["user_uid"]
+
+    result = await session.exec(
+        select(RefreshToken).where(
+            RefreshToken.user_uid == user_uid, RefreshToken.revoked.is_(False)
+        )
+    )
+
+    tokens = result.all()
+
+    for token in tokens:
+        token.revoked = True
+        session.add(token)
+
+    await session.commit()
+
+    return JSONResponse(
+        content={"message": "Logged out successfully"}, status_code=status.HTTP_200_OK
+    )

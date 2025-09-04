@@ -83,9 +83,9 @@ def decode_token(token: str) -> dict:
         )
 
     except ExpiredSignatureError:
-        logging.warning("Token has expired yes")
+        logging.warning("Token has expired")
 
         raise TokenExpired()
     except jwt.PyJWTError as err:
-        logging.exception("Invalid token yes: %s", err)
+        logging.exception("Invalid token: %s", err)
         raise InvalidToken()
