@@ -12,7 +12,7 @@ import logging
 
 password_context = CryptContext(schemes=["bcrypt"])
 
-ACCESS_TOKEN_EXPIRY = 60
+ACCESS_TOKEN_EXPIRY = 180
 REFRESH_TOKEN_EXPIRY = 86400
 
 

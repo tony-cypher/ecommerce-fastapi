@@ -66,7 +66,7 @@ class RefreshTokenBearer(TokenBearer):
             raise InvalidRefreshToken()
 
         if await is_token_revoked(token_data["jti"], session):
-            raise InvalidToken()
+            raise InvalidRefreshToken()
 
 
 async def get_current_user(

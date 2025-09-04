@@ -3,12 +3,14 @@ from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from datetime import datetime
 from src.db.main import get_session
 from src.db.models import RefreshToken
+from src.errors import InvalidRefreshToken
 from .service import UserService
 from .schemas import SignupModel, LoginModel, UserModel
 from .utils import verify_password, create_access_token, create_refresh_token
-from .dependencies import get_current_user, AccessTokenBearer
+from .dependencies import get_current_user, AccessTokenBearer, RefreshTokenBearer
 
 auth_router = APIRouter()
 user_service = UserService()
@@ -93,3 +95,14 @@ async def logout(
     return JSONResponse(
         content={"message": "Logged out successfully"}, status_code=status.HTTP_200_OK
     )
+
+
+@auth_router.get("/refresh_token")
+async def get_access_token(token_details: dict = Depends(RefreshTokenBearer())):
+    expiry_time = token_details["exp"]
+
+    if datetime.fromtimestamp(expiry_time) > datetime.now():
+        access_token = create_access_token(user_data=token_details["user"])
+        return JSONResponse(content={"access_token": access_token})
+
+    raise InvalidRefreshToken()
