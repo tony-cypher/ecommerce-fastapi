@@ -81,13 +81,23 @@ class PasswordResetToken(SQLModel, table=True):
         sa_column=Column(pg.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     )
     user_uid: uuid.UUID = Field(
-        sa_column=(pg.UUID, ForeignKey("user.uid", ondelete="CASCADE")), nullable=False
+        sa_column=Column(
+            pg.UUID(as_uuid=True),
+            ForeignKey("users.uid", ondelete="CASCADE"),
+            nullable=False,
+        )
     )
     token: str = Field(sa_column=Column(pg.VARCHAR(255), unique=True, nullable=False))
     expires_at: datetime = Field(
-        sa_column=Column(pg.TIMESTAMP(timezone=True)),
-        nullable=False,
-        default=lambda: utc_now() + timedelta(minutes=30),
+        sa_column=Column(
+            pg.TIMESTAMP(timezone=True),
+            nullable=False,
+            default=lambda: utc_now() + timedelta(minutes=30),
+        ),
     )
-    used: bool = Field(default=False)
-    created_at: datetime = Field(default=utc_now, nullable=False)
+    used: bool = Field(
+        sa_column=Column(Boolean, nullable=False, server_default="false")
+    )
+    created_at: datetime = Field(
+        sa_column=Column(pg.TIMESTAMP(timezone=True), default=utc_now, nullable=False)
+    )

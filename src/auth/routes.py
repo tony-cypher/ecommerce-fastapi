@@ -5,15 +5,22 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from datetime import datetime
 from src.db.main import get_session
-from src.db.models import RefreshToken
-from src.errors import InvalidRefreshToken
-from .service import UserService
-from .schemas import SignupModel, LoginModel, UserModel
+from src.db.models import RefreshToken, User
+from src.errors import InvalidRefreshToken, UserNotFound
+from .service import UserService, PasswordResetService
+from .schemas import (
+    SignupModel,
+    LoginModel,
+    UserModel,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+)
 from .utils import verify_password, create_access_token, create_refresh_token
 from .dependencies import get_current_user, AccessTokenBearer, RefreshTokenBearer
 
 auth_router = APIRouter()
 user_service = UserService()
+# password_reset_service = PasswordResetService(AsyncSession=Depends(get_session))
 
 
 @auth_router.post("/signup", status_code=status.HTTP_201_CREATED)
@@ -106,3 +113,40 @@ async def get_access_token(token_details: dict = Depends(RefreshTokenBearer())):
         return JSONResponse(content={"access_token": access_token})
 
     raise InvalidRefreshToken()
+
+
+@auth_router.post("/try-mail")
+async def test_mail(
+    data: ForgotPasswordRequest, session: AsyncSession = Depends(get_session)
+):
+    result = await session.exec(select(User).where(User.email == data.email))
+    user = result.first()
+    if not user:
+        raise UserNotFound()
+
+    service = PasswordResetService(session)
+    await service.send_mail_test(user)
+    return {"message": "Test Email sent"}
+
+
+@auth_router.post("/forgot-password")
+async def forgot_password(
+    data: ForgotPasswordRequest, session: AsyncSession = Depends(get_session)
+):
+    result = await session.exec(select(User).where(User.email == data.email))
+    user = result.first()
+    if not user:
+        raise UserNotFound()
+
+    service = PasswordResetService(session)
+    await service.send_reset_email(user)
+    return {"message": "Password reset email sent"}
+
+
+@auth_router.post("/reset-password")
+async def reset_password(
+    data: ResetPasswordRequest, session: AsyncSession = Depends(get_session)
+):
+    service = PasswordResetService(session)
+    await service.reset_password(token=data.token, new_password=data.new_password)
+    return {"message": "Password has been reset successfully"}
