@@ -8,6 +8,7 @@ from src.errors import TokenExpired, InvalidToken
 import uuid
 import jwt
 import logging
+import hashlib
 
 
 password_context = CryptContext(schemes=["bcrypt"])
@@ -22,6 +23,10 @@ def generate_password_hash(password: str) -> str:
 
 def verify_password(password: str, hash: str) -> bool:
     return password_context.verify(password, hash)
+
+
+def hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
 
 
 def create_access_token(

@@ -1,14 +1,14 @@
 import secrets
 from fastapi_mail import FastMail, MessageSchema
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel import select
+from sqlmodel import select, delete
 from datetime import datetime, timezone, timedelta
 from src.db.models import User, PasswordResetToken
 from src.mail import mail_config
 from src.config import settings
 from src.errors import InvalidToken, UserNotFound
 from .schemas import SignupModel
-from .utils import generate_password_hash
+from .utils import generate_password_hash, hash_token
 
 
 class UserService:
@@ -47,13 +47,19 @@ class PasswordResetService:
         await self.mail.send_message(message)
 
     async def send_reset_email(self, user: User):
-        # Generate secure token
-        token = secrets.token_urlsafe(48)
+        # Delete all old tokens for this user
+        await self.session.exec(
+            delete(PasswordResetToken).where(PasswordResetToken.user_uid == user.uid)
+        )
 
-        # Save reset token
+        # Generate secure token
+        raw_token = secrets.token_urlsafe(48)
+        token_hash = hash_token(raw_token)
+
+        # Save hashed reset token
         reset_token = PasswordResetToken(
             user_uid=user.uid,
-            token=token,
+            token=token_hash,
             expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
         )
         self.session.add(reset_token)
@@ -62,7 +68,7 @@ class PasswordResetService:
 
         # Email content
         reset_link = (
-            f"http://{settings.DOMAIN}/api/v1/auth/reset-password?token={token}"
+            f"http://{settings.DOMAIN}/api/v1/auth/reset-password?token={raw_token}"
         )
         message = MessageSchema(
             subject="Password Reset Request",
@@ -74,8 +80,10 @@ class PasswordResetService:
         await self.mail.send_message(message)
 
     async def reset_password(self, token: str, new_password: str):
+        token_hash = hash_token(token)
+
         result = await self.session.exec(
-            select(PasswordResetToken).where(PasswordResetToken.token == token)
+            select(PasswordResetToken).where(PasswordResetToken.token == token_hash)
         )
         reset_token = result.first()
 
@@ -85,7 +93,7 @@ class PasswordResetService:
         if reset_token.used or reset_token.expires_at < datetime.now(timezone.utc):
             raise InvalidToken()
 
-        # Get user
+        # Fetch user
         result = await self.session.exec(
             select(User).where(User.uid == reset_token.user_uid)
         )
