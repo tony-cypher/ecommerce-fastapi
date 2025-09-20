@@ -8,7 +8,7 @@ from src.mail import mail_config
 from src.config import settings
 from src.errors import InvalidToken, UserNotFound
 from .schemas import SignupModel
-from .utils import generate_password_hash, hash_token
+from .utils import generate_password_hash, hash_token, create_url_safe_token
 
 
 class UserService:
@@ -25,11 +25,32 @@ class UserService:
     async def create_user(self, data: SignupModel, session: AsyncSession):
         user_data = data.model_dump()
         new_user = User(**user_data)
+        email = user_data["email"]
         new_user.password_hash = generate_password_hash(user_data["password"])
         new_user.role = "user"
         session.add(new_user)
         await session.commit()
+
+        token = create_url_safe_token({"email": email})
+        link = f"http://{settings.DOMAIN}/api/v1/auth/verify/{token}"
+        mail = FastMail(config=mail_config)
+        message = MessageSchema(
+            subject="Verify your Email",
+            recipients=[email],
+            body=f"<p>Click the <a href='{link}'>link</a> to verify your email/p>",
+            subtype="html",
+        )
+
+        await mail.send_message(message)
+
         return new_user
+
+    async def update_user(self, user: User, user_data: dict, session: AsyncSession):
+        for k, v in user_data.items():
+            setattr(user, k, v)
+
+        await session.commit()
+        return user
 
 
 class PasswordResetService:

@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from datetime import datetime
 from src.db.main import get_session
 from src.db.models import RefreshToken, User
-from src.errors import InvalidRefreshToken, UserNotFound
+from src.errors import InvalidRefreshToken, UserNotFound, UserAlreadyExists
 from .service import UserService, PasswordResetService
 from .schemas import (
     SignupModel,
@@ -15,7 +15,12 @@ from .schemas import (
     ForgotPasswordRequest,
     ResetPasswordRequest,
 )
-from .utils import verify_password, create_access_token, create_refresh_token
+from .utils import (
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    decode_url_safe_token,
+)
 from .dependencies import get_current_user, AccessTokenBearer, RefreshTokenBearer
 
 auth_router = APIRouter()
@@ -29,12 +34,33 @@ async def signup(user_data: SignupModel, session: AsyncSession = Depends(get_ses
     user_exists = await user_service.user_exists(email, session)
 
     if user_exists:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User with email already exists",
-        )
+        raise UserAlreadyExists()
+
     new_user = await user_service.create_user(user_data, session)
-    return {"message": "Account created successfully", "user": new_user}
+
+    return {
+        "message": "Account created successfully. Check email to verify your account",
+        "user": new_user,
+    }
+
+
+@auth_router.get("/verify/{token}")
+async def verify_user_account(token: str, session: AsyncSession = Depends(get_session)):
+    token_data = decode_url_safe_token(token)
+    email = token_data.get("email")
+
+    if email:
+        user = await user_service.get_user(email, session)
+
+        if not user:
+            raise UserNotFound()
+
+        await user_service.update_user(user, {"is_verified": True}, session)
+
+        return JSONResponse(
+            content={"message": "Account verified successfully"},
+            status_code=status.HTTP_200_OK,
+        )
 
 
 @auth_router.post("/login")

@@ -77,3 +77,13 @@ class UserNotFound(EcommerceException):
             resolution="Ensure the user exists or register a new account",
             error_code="UserNotFound",
         )
+
+
+class UserAlreadyExists(EcommerceException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="User with email already exists",
+            resolution="User already exists, try login",
+            error_code="UserAlreadyExists",
+        )
