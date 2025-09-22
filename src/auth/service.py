@@ -1,14 +1,29 @@
 import secrets
+
+# import httpx
+from fastapi import HTTPException, status
 from fastapi_mail import FastMail, MessageSchema
+
+# from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select, delete
 from datetime import datetime, timezone, timedelta
+
+# from google.oauth2 import id_token
+# from google.auth.transport import requests as grequests
 from src.db.models import User, PasswordResetToken
 from src.mail import mail_config
 from src.config import settings
-from src.errors import InvalidToken, UserNotFound
+from src.errors import InvalidToken, UserNotFound  # , FailedOauth
 from .schemas import SignupModel
-from .utils import generate_password_hash, hash_token, create_url_safe_token
+from .utils import (
+    generate_password_hash,
+    hash_token,
+    create_url_safe_token,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+)
 
 
 class UserService:
@@ -44,6 +59,38 @@ class UserService:
         await mail.send_message(message)
 
         return new_user
+
+    async def login(self, data: dict, session: AsyncSession):
+        email = data.email
+        password = data.password
+
+        user = await self.get_user(email, session)
+
+        if user is not None:
+            password_valid = verify_password(password, user.password_hash)
+
+            if password_valid:
+                access_token = create_access_token(
+                    user_data={
+                        "email": user.email,
+                        "user_uid": str(user.uid),
+                        "role": user.role,
+                    }
+                )
+                refresh_token = await create_refresh_token(
+                    user_data={"email": user.email, "user_uid": str(user.uid)},
+                    session=session,
+                )
+
+                return {
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "user": {"email": user.email, "uid": str(user.uid)},
+                }
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Email or Password"
+        )
 
     async def update_user(self, user: User, user_data: dict, session: AsyncSession):
         for k, v in user_data.items():
