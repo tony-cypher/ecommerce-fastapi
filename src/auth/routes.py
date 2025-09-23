@@ -12,7 +12,7 @@ from src.errors import (
     UserNotFound,
     UserAlreadyExists,
 )
-from .service import UserService, PasswordResetService
+from .service import UserService, PasswordResetService, GoogleAuthService
 from .schemas import (
     SignupModel,
     LoginModel,
@@ -30,6 +30,7 @@ from .dependencies import get_current_user, AccessTokenBearer, RefreshTokenBeare
 
 auth_router = APIRouter()
 user_service = UserService()
+oauth_service = GoogleAuthService()
 # password_reset_service = PasswordResetService(AsyncSession=Depends(get_session))
 
 
@@ -162,4 +163,11 @@ async def reset_password(
 
 @auth_router.get("/google-login")
 async def google_login():
-    pass
+    res = await oauth_service.google_login()
+    return res
+
+
+@auth_router.get("/oauth2callback")
+async def oauth_callback(code: str, session: AsyncSession = Depends(get_session)):
+    user_data = await oauth_service.google_callback(code, session)
+    return user_data

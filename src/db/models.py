@@ -31,8 +31,13 @@ class User(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="false")
     )
 
-    password_hash: str = Field(
-        sa_column=Column(String(255), nullable=False), exclude=True
+    password_hash: Optional[str] = Field(default=None, exclude=True)
+
+    auth_provider: str = Field(
+        sa_column=Column(pg.VARCHAR(50), nullable=False, server_default="local")
+    )
+    google_id: Optional[str] = Field(
+        sa_column=Column(pg.VARCHAR(255), unique=True, nullable=True)
     )
 
     created_at: datetime = Field(
