@@ -87,3 +87,23 @@ class UserAlreadyExists(EcommerceException):
             resolution="User already exists, try login",
             error_code="UserAlreadyExists",
         )
+
+
+class InvalidCredentials(EcommerceException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Invalid Credentials",
+            resolution="Check details and try again",
+            error_code="InvalidCredentials",
+        )
+
+
+class FailedOauth(EcommerceException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            message="Failed to obtain ID token",
+            resolution="Try again",
+            error_code="FailedIDToken",
+        )
